@@ -81,7 +81,7 @@ while true do
         for idx, tunnelTurtle in pairs(Turtles) do
             -- Get turtle status
             rednet.send(tunnelTurtle.id, "status", Protocol)
-            local id, message = rednet.receive(Protocol, 1)
+            local id, message = rednet.receive(Protocol, 3)
             if message ~= nil and message ~= "started" and message ~= "paused" then
                 local progressData = textutils.unserialize(message)
                 updateTurtle(id, progressData)
