@@ -7,6 +7,7 @@ Status = "Running"
 TunnelInfo = {}
 Curves = {}
 FacingDir = nil
+TorchTimer = 0
 
 local function log(message)
     loglib.log("tunnel", message)
@@ -102,11 +103,14 @@ end
 
 function act(dt)
     if movement.spareInventoryFull() then
-        local facingDir, success = movement.placeChest(FacingDir)
+        local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.frameDir, log)
         FacingDir = facingDir
         if not success then
             pause("Out of chests")
         end
+    end
+    if TunnelInfo.frameDir == nil then
+        TunnelInfo.frameDir = FacingDir
     end
     local frame = pathing.getCurvePosAt(TunnelInfo.curveProgress, Curves[TunnelInfo.currentCurve])
     log("Frame determined: ("..frame.x..", "..frame.y..", "..frame.z..")")
@@ -115,6 +119,11 @@ function act(dt)
     if TunnelInfo.frameProgress == TunnelInfo.width * TunnelInfo.height then
         if frame.x == x and frame.y == y and frame.z == z then
             TunnelInfo.frameProgress = 0
+            if TorchTimer == TunnelInfo.torchSpacing then
+                TorchTimer = 0
+            end
+            TorchTimer = TorchTimer + 1
+            log("TorchTimer: "..TorchTimer..", Torch Spacing: "..TunnelInfo.torchSpacing)
             local nextPoint
             repeat
                 if TunnelInfo.curveProgress > 1 then
@@ -137,10 +146,27 @@ function act(dt)
             if nextPoint.x ~= x and nextPoint.y == y and nextPoint.z == z then
                 TunnelInfo.frameWAxis = "z"
                 TunnelInfo.frameHAxis = "y"
+                if nextPoint.x - x > 0 then
+                    TunnelInfo.frameDir = "+x"
+                else
+                    TunnelInfo.frameDir = "-x"
+                end
             end
             if nextPoint.x == x and nextPoint.y == y and nextPoint.z ~= z then
                 TunnelInfo.frameWAxis = "x"
                 TunnelInfo.frameHAxis = "y"
+                if nextPoint.z - z > 0 then
+                    TunnelInfo.frameDir = "+z"
+                else
+                    TunnelInfo.frameDir = "-z"
+                end
+            end
+            if nextPoint.x == x and nextPoint.y ~= y and nextPoint.z == z then
+                if nextPoint.y - y > 0 then
+                    TunnelInfo.frameDir = "+y"
+                else
+                    TunnelInfo.frameDir = "-y"
+                end
             end
             log("Tunnel axes calculated for frame: "..TunnelInfo.frameWAxis.." by "..TunnelInfo.frameHAxis)
 
@@ -168,6 +194,13 @@ function act(dt)
             until x == frame.x and y == frame.y and z == frame.z
         end
         if TunnelInfo.frameProgress % TunnelInfo.width == 0 then
+            if TorchTimer == 1 then
+                if TunnelInfo.frameHAxis == "y" then
+                    if y == math.floor(TunnelInfo.height / 2 + frame.y) then
+                        movement.placeTorch(FacingDir, TunnelInfo.frameDir, log)
+                    end
+                end
+            end
             if TunnelInfo.frameProgress ~= 0 then
                 local has_block, data = turtle.inspect()
                 if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
@@ -189,6 +222,11 @@ function act(dt)
                 end
                 if TunnelInfo.frameHAxis == "y" then
                     movement.moveUp()
+                    if TorchTimer == 1 then
+                        if y + 1 == math.floor(TunnelInfo.height / 2 + frame.y) then
+                            movement.placeTorch(FacingDir, TunnelInfo.frameDir, log)
+                        end
+                    end
                 else
                     movement.moveForward()
                     FacingDir = movement.turnRight(FacingDir)

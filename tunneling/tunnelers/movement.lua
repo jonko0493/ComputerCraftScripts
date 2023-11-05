@@ -224,15 +224,24 @@ local function placeBlockUp()
     return true
 end
 
+local function oppositeDir(dir)
+    if string.sub(dir, 1, 1) == "-" then
+        return "+"..string.sub(dir, 2)
+    else
+        return "-"..string.sub(dir, 2)
+    end
+end
+
 local function spareInventoryFull()
     return turtle.getItemCount(4) > 0 and turtle.getItemCount(5) > 0 and turtle.getItemCount(6) > 0 and turtle.getItemCount(7) > 0 and turtle.getItemCount(8) > 0 and turtle.getItemCount(9) > 0 and turtle.getItemCount(10) > 0 and turtle.getItemCount(11) > 0 and turtle.getItemCount(12) > 0
 end
 
-local function placeChest(facingDir)
+local function placeChest(facingDir, frameDir, log)
+    local originalDir = facingDir
     if turtle.getItemCount(1) == 0 then
         return facingDir, false
     end
-    facingDir = reverse(facingDir)
+    facingDir = turnToward(facingDir, oppositeDir(frameDir), log)
     if turtle.detect() then
         turtle.dig()
     end
@@ -243,8 +252,26 @@ local function placeChest(facingDir)
         turtle.select(i)
         turtle.drop()
     end
-    facingDir = reverse(facingDir)
+    facingDir = turnToward(facingDir, originalDir, log)
     return facingDir, true
 end
 
-return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest }
+local function placeTorch(facingDir, frameDir, log)
+    local originalDir = facingDir
+    if turtle.getItemCount(2) == 0 then
+        turtle.select(3)
+        turtle.transferTo(2)
+    end
+    if turtle.getItemCount(2) == 0 then
+        return facingDir, false
+    end
+    turtle.select(2)
+    
+    facingDir = turnToward(facingDir, oppositeDir(frameDir), log)
+    turtle.place()
+    assert(originalDir, "originalDir worked")
+    facingDir = turnToward(facingDir, originalDir, log)
+    return facingDir, true
+end
+
+return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest, placeTorch = placeTorch }
