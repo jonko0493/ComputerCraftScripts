@@ -27,7 +27,10 @@ for idx, point in pairs(pointsStr) do
     points[idx] = { x = tonumber(pointVals[1]), y = tonumber(pointVals[2]), z = tonumber(pointVals[3]) }
 end
 
-startInfo = { width = w, height = h, points = points, progress = 0 }
+local startWAxis = args[4]
+local startHAxis = args[5]
+
+startInfo = { width = w, height = h, points = points, frameProgress = 0, frameWAxis = startWAxis, frameHAxis = startHAxis, currentCurve = 1, curveProgress = 0, progress = 0 }
 
 turtleId = rednet.lookup(Protocol, turtleName)
 if turtleId ~= nil then
@@ -37,17 +40,17 @@ if turtleId ~= nil then
         rednet.send(turtleId, textutils.serialize(startInfo), "tunnel-start")
         local startId, startMessage = rednet.receive(Protocol, 5)
         if startMessage == "started" then
-            write("Started tunneling!")
+            write("Started tunneling!\n")
         else
             if startMessage ~= nil then
-                write("Failed: "..startMessage)
+                write("Failed: "..startMessage.."\n")
             else
-                write("Failed nonresponsively!")
+                write("Failed nonresponsively!\n")
             end
         end
     else
-        write("Device did not respond")
+        write("Device did not respond\n")
     end
 else
-    write("Failed to find "..turtleName)
+    write("Failed to find "..turtleName.."\n")
 end

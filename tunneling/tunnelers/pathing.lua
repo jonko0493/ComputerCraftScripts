@@ -83,4 +83,9 @@ local function getCurvesFromPoints(points)
     return curves
 end
 
-return { getCurvesFromPoints = getCurvesFromPoints }
+local function getCurvePosAt(t, curve)
+    local point = bezier.curve_evaluate_at(t, curve[1], curve[2], curve[3], curve[4])
+    return { x = math.floor(point.x), y = math.floor(point.y), z = math.floor(point.z) }
+end
+
+return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt }

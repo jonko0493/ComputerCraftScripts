@@ -1,0 +1,249 @@
+local function moveForward()
+    if turtle.detect() then
+        turtle.dig()
+    end
+    if not turtle.forward() then
+        -- something's blocking us, try to clear
+        repeat
+            turtle.attack()
+        until turtle.forward()
+    end
+end
+
+local function moveUp()
+    if turtle.detectUp() then
+        turtle.digUp()
+    end
+    if not turtle.up() then
+        -- something's blocking us, try to clear
+        repeat
+            turtle.attack()
+        until turtle.up()
+    end
+end
+
+local function moveDown()
+    if turtle.detectDown() then
+        turtle.digDown()
+    end
+    if not turtle.down() then
+        repeat
+            turtle.attackDown()
+        until turtle.down()
+    end
+end
+
+local function turnLeft(facingDir)
+    if turtle.turnLeft() then
+        if facingDir == "+x" then
+            return "-z"
+        end
+        if facingDir == "-z" then
+            return "-x"
+        end
+        if facingDir == "-x" then
+            return "+z"
+        end
+        if facingDir == "+z" then
+            return "+x"
+        end
+    end
+    return facingDir
+end
+
+local function turnRight(facingDir)
+    if turtle.turnRight() then
+        if facingDir == "+x" then
+            return "+z"
+        end
+        if facingDir == "+z" then
+            return "-x"
+        end
+        if facingDir == "-x" then
+            return "-z"
+        end
+        if facingDir == "-z" then
+            return "+x"
+        end
+    end
+    return facingDir
+end
+
+local function facingDirToDegrees(facingDir)
+    if facingDir == "-z" then
+        return 0
+    end
+    if facingDir == "+x" then
+        return 90
+    end
+    if facingDir == "+z" then
+        return 180
+    end
+    if facingDir == "-x" then
+        return 270
+    end
+end
+
+local function turnToward(currentDir, targetDir)
+    if currentDir == targetDir then
+        return
+    end
+    local cDeg = facingDirToDegrees(currentDir)
+    local tDeg = facingDirToDegrees(targetDir)
+    local dtheta = cDeg - tDeg
+
+    if math.abs(dtheta) > 180 then
+        dtheta = dtheta / -3 -- e.g. -270 -> 90, 270 -> -90
+    end
+
+    if dtheta > 0 then
+        repeat
+            currentDir = turnLeft(currentDir)
+        until currentDir == targetDir
+    else
+        repeat
+            currentDir = turnRight(currentDir)
+        until currentDir == targetDir
+    end
+
+    return targetDir
+end
+
+local function reverse(facingDir)
+    facingDir = turnRight(facingDir)
+    return turnRight(facingDir)
+end
+
+local function moveToward(point, facingDir)
+    local x, y, z = gps.locate()
+    if x == point.x and y == point.y and z == point.z then
+        return facingDir, true
+    end
+    local dx = math.abs(point.x - x)
+    local dy = math.abs(point.y - y)
+    local dz = math.abs(point.z - z)
+
+    -- we do this to "eliminate" the zeroes
+    if dx == 0 then
+        dx = 10000000
+    end
+    if dy == 0 then
+        dy = 10000000
+    end
+    if dz == 0 then
+        dz = 10000000
+    end
+
+    if dx == math.min(dx, dy, dz) then
+        if point.x < x then
+            facingDir = turnToward(facingDir, "-x")
+        else
+            facingDir = turnToward(facingDir, "+x")
+        end
+        moveForward()
+    end
+    if dy == math.min(dx, dy, dz) then
+        if point.y < y then
+            moveUp()
+        else
+            moveDown()
+        end
+    end
+    if dz == math.min(dx, dy, dz) then
+        if point.z < z then
+            facingDir = turnToward(facingDir, "-z")
+        else
+            facingDir = turnToward(facingDir, "+z")
+        end
+        moveForward()
+    end
+    return facingDir, false
+end
+
+local function determineFacingDirection()
+    x, y, z = gps.locate()
+    moveForward()
+    nx, ny, nz = gps.locate()
+    reverse()
+    moveForward()
+    reverse()
+    if nx ~= nz then
+        if nx - x == 1 then
+            return "+x"
+        else
+            return "-x"
+        end
+    else
+        if nz - z == 1 then
+            return "+z"
+        else
+            return "-z"
+        end
+    end
+end
+
+local function handleBlockPlaceInventory()
+    if turtle.getItemCount(13) == 0 then
+        turtle.select(14)
+        turtle.transferTo(13)
+        turtle.select(15)
+        turtle.transferTo(14)
+        turtle.select(16)
+        turtle.transferTo(15)
+    end
+end
+
+local function placeBlock()
+    handleBlockPlaceInventory()
+    turtle.select(13)
+    if turtle.getItemCount() == 0 then
+        return false
+    end
+    turtle.place()
+    return true
+end
+
+local function placeBlockDown()
+    handleBlockPlaceInventory()
+    turtle.select(13)
+    if turtle.getItemCount() == 0 then
+        return false
+    end
+    turtle.placeDown()
+    return true
+end
+
+local function placeBlockUp()
+    handleBlockPlaceInventory()
+    turtle.select(13)
+    if turtle.getItemCount() == 0 then
+        return false
+    end
+    turtle.placeUp()
+    return true
+end
+
+local function spareInventoryFull()
+    return turtle.getItemCount(4) > 0 and turtle.getItemCount(5) > 0 and turtle.getItemCount(6) > 0 and turtle.getItemCount(7) > 0 and turtle.getItemCount(8) > 0 and turtle.getItemCount(9) > 0 and turtle.getItemCount(10) > 0 and turtle.getItemCount(11) > 0 and turtle.getItemCount(12) > 0
+end
+
+local function placeChest(facingDir)
+    if turtle.getItemCount(1) == 0 then
+        return facingDir, false
+    end
+    facingDir = reverse(facingDir)
+    if turtle.detect() then
+        turtle.dig()
+    end
+    turtle.select(1)
+    turtle.place()
+    
+    for i = 4, 12 do
+        turtle.select(i)
+        turtle.drop()
+    end
+    facingDir = reverse(facingDir)
+    return facingDir, true
+end
+
+return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest }
