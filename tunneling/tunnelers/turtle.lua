@@ -110,6 +110,7 @@ function act(dt)
     end
     local frame = pathing.getCurvePosAt(TunnelInfo.curveProgress, Curves[TunnelInfo.currentCurve])
     log("Frame determined: ("..frame.x..", "..frame.y..", "..frame.z..")")
+    log("FacingDir: "..FacingDir)
     local x, y, z = gps.locate()
     if TunnelInfo.frameProgress == TunnelInfo.width * TunnelInfo.height then
         if frame.x == x and frame.y == y and frame.z == z then
@@ -118,6 +119,9 @@ function act(dt)
             repeat
                 if TunnelInfo.curveProgress > 1 then
                     TunnelInfo.currentCurve = TunnelInfo.currentCurve + 1
+                    if TunnelInfo.currentCurve > #Curves then
+                        pause("Complete!")
+                    end
                 end
                 nextPoint = pathing.getCurvePosAt(TunnelInfo.curveProgress + dt, Curves[TunnelInfo.currentCurve])
                 if math.abs(nextPoint.x - x) > 1 or math.abs(nextPoint.y - y) > 1 or math.abs(nextPoint.z - z) > 1 then
@@ -141,17 +145,25 @@ function act(dt)
             log("Tunnel axes calculated for frame: "..TunnelInfo.frameWAxis.." by "..TunnelInfo.frameHAxis)
 
             repeat
-                FacingDir = movement.moveToward(frame, FacingDir)
+                local facingDir, success = movement.moveToward(frame, FacingDir, log)
+                FacingDir = facingDir
                 x, y, z = gps.locate()
             until x == frame.x and y == frame.y and z == frame.z
         else
-            FacingDir = movement.moveToward(frame, FacingDir)
+            local facingDir, success = movement.moveToward(frame, FacingDir, log)
+            FacingDir = facingDir
+            return
         end
+        if TunnelInfo.frameWAxis == "x" or TunnelInfo.frameWAxis == "z" then
+            FacingDir = movement.turnRight(FacingDir)
+        end
+        TunnelInfo.frameProgress = 1
     else
         log("Start of frame info: Frame progress: "..TunnelInfo.frameProgress..", w-axis: "..TunnelInfo.frameWAxis..", h-axis: "..TunnelInfo.frameHAxis)
         if TunnelInfo.frameProgress == 0 then
             repeat
-                FacingDir = movement.moveToward(frame, FacingDir)
+                local facingDir, success = movement.moveToward(frame, FacingDir, log)
+                FacingDir = facingDir
                 x, y, z = gps.locate()
             until x == frame.x and y == frame.y and z == frame.z
         end
@@ -175,12 +187,12 @@ function act(dt)
                 else
                     FacingDir = movement.turnRight(FacingDir)
                 end
-            end
-            if TunnelInfo.frameHAxis == "y" then
-                movement.moveUp()
-            else
-                movement.moveForward()
-                movement.turnRight()
+                if TunnelInfo.frameHAxis == "y" then
+                    movement.moveUp()
+                else
+                    movement.moveForward()
+                    FacingDir = movement.turnRight(FacingDir)
+                end
             end
         else
             movement.moveForward()

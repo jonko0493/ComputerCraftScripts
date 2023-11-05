@@ -84,10 +84,11 @@ local function facingDirToDegrees(facingDir)
     end
 end
 
-local function turnToward(currentDir, targetDir)
+local function turnToward(currentDir, targetDir, log)
     if currentDir == targetDir then
-        return
+        return currentDir
     end
+    log("Current dir: "..currentDir..", Target dir: "..targetDir)
     local cDeg = facingDirToDegrees(currentDir)
     local tDeg = facingDirToDegrees(targetDir)
     local dtheta = cDeg - tDeg
@@ -114,7 +115,7 @@ local function reverse(facingDir)
     return turnRight(facingDir)
 end
 
-local function moveToward(point, facingDir)
+local function moveToward(point, facingDir, log)
     local x, y, z = gps.locate()
     if x == point.x and y == point.y and z == point.z then
         return facingDir, true
@@ -135,25 +136,25 @@ local function moveToward(point, facingDir)
     end
 
     if dx == math.min(dx, dy, dz) then
-        if point.x < x then
-            facingDir = turnToward(facingDir, "-x")
+        if x < point.x then
+            facingDir = turnToward(facingDir, "+x", log)
         else
-            facingDir = turnToward(facingDir, "+x")
+            facingDir = turnToward(facingDir, "-x", log)
         end
         moveForward()
     end
     if dy == math.min(dx, dy, dz) then
-        if point.y < y then
+        if y < point.y then
             moveUp()
         else
             moveDown()
         end
     end
     if dz == math.min(dx, dy, dz) then
-        if point.z < z then
-            facingDir = turnToward(facingDir, "-z")
+        if z < point.z then
+            facingDir = turnToward(facingDir, "+z", log)
         else
-            facingDir = turnToward(facingDir, "+z")
+            facingDir = turnToward(facingDir, "-z", log)
         end
         moveForward()
     end

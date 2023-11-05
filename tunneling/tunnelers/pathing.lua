@@ -85,7 +85,7 @@ end
 
 local function getCurvePosAt(t, curve)
     local point = bezier.curve_evaluate_at(t, curve[1], curve[2], curve[3], curve[4])
-    return { x = math.floor(point.x), y = math.floor(point.y), z = math.floor(point.z) }
+    return { x = math.floor(point.x + 0.5), y = math.floor(point.y + 0.5), z = math.floor(point.z + 0.5) }
 end
 
 return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt }
