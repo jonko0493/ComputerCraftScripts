@@ -3,6 +3,7 @@ local movement = require("movement")
 local loglib = require("loglib")
 
 Protocol = "tunnel"
+Function = "tunnel"
 Status = "Running"
 TunnelInfo = {}
 Curves = {}
@@ -19,7 +20,7 @@ local function sendStatusMessage(recipient, status)
     if TunnelInfo.progress ~= nil then
         nilCoalescedProgress = TunnelInfo.progress
     end
-    rednet.send(recipient, textutils.serialize({ name = os.getComputerLabel(), x = x, y = y, z = z, fuel = turtle.getFuelLevel(), maxFuel = turtle.getFuelLimit(), progress = nilCoalescedProgress, status = status }), Protocol)
+    rednet.send(recipient, textutils.serialize({ name = os.getComputerLabel(), x = x, y = y, z = z, fuel = turtle.getFuelLevel(), maxFuel = turtle.getFuelLimit(), progress = nilCoalescedProgress, status = status, facingDir = FacingDir }), Protocol)
 end
 
 local function refuel(id)
@@ -57,6 +58,14 @@ end
 local function start(startMessage)
     TunnelInfo = textutils.unserialize(startMessage)
     Curves = pathing.getCurvesFromPoints(TunnelInfo.points)
+    Function = "tunnel"
+    log("There are "..#Curves.." curves calculated")
+end
+
+local function startStairs(stairsMessage)
+    TunnelInfo = textutils.unserialize(stairsMessage)
+    Function = "stairs"
+    TunnelInfo.originalDir = FacingDir
 end
 
 local function saveProgress()
@@ -85,19 +94,29 @@ local function pause(statusMessage)
         if message == "logs" then
             sendLogs(id)
         end
-    until message == "resume" or message == "start"
+    until message == "resume" or message == "start" or message == "stairs"
     if message == "resume" then
         rednet.send(id, "resumed", Protocol)
         write("Sent resume message")
     else
-        rednet.send(id, "ready", Protocol)
-        local startId, startMessage = rednet.receive("tunnel-start", 2)
-        local tunnelInfoFile = fs.open("tunnel-info.txt", "w")
-        tunnelInfoFile.write(startMessage)
-        tunnelInfoFile.close()
-        start(startMessage)
-        rednet.send(id, "started", Protocol)
-        write("Sent start message")
+        if message == "start" then
+            rednet.send(id, "ready", Protocol)
+            local startId, startMessage = rednet.receive("tunnel-start", 2)
+            local tunnelInfoFile = fs.open("tunnel-info.txt", "w")
+            tunnelInfoFile.write(startMessage)
+            tunnelInfoFile.close()
+            start(startMessage)
+            rednet.send(id, "started", Protocol)
+            write("Sent start message")
+        else
+            if message == "stairs" then
+                rednet.send(id, "ready", Protocol)
+                local stairsId, stairsMessage = rednet.receive("stairs-start", 2)
+                startStairs(stairsMessage)
+                rednet.send(id, "started", Protocol)
+                write("Sent start stairs message")
+            end
+        end
     end
 end
 
@@ -128,11 +147,16 @@ function act(dt)
             repeat
                 if TunnelInfo.curveProgress > 1 then
                     TunnelInfo.currentCurve = TunnelInfo.currentCurve + 1
+                    log("Current curve: "..TunnelInfo.currentCurve..", Total curves: "..#Curves)
                     if TunnelInfo.currentCurve > #Curves then
                         pause("Complete!")
                     end
+                    TunnelInfo.curveProgress = 0
                 end
                 nextPoint = pathing.getCurvePosAt(TunnelInfo.curveProgress + dt, Curves[TunnelInfo.currentCurve])
+                if TunnelInfo.currentCurve > 1 then
+                    log("Curve Progress: "..TunnelInfo.curveProgress..", Next Point: ("..nextPoint.x..", "..nextPoint.y..", "..nextPoint.z..")")
+                end
                 if math.abs(nextPoint.x - x) > 1 or math.abs(nextPoint.y - y) > 1 or math.abs(nextPoint.z - z) > 1 then
                     dt = dt / 2
                     nextPoint = { x = x, y = y, z = z } -- reset so we can try again
@@ -181,7 +205,11 @@ function act(dt)
             return
         end
         if TunnelInfo.frameWAxis == "x" or TunnelInfo.frameWAxis == "z" then
-            FacingDir = movement.turnRight(FacingDir)
+            if TunnelInfo.frameWAxis ~= TunnelInfo.startWAxis then
+                FacingDir = movement.turnLeft(FacingDir)
+            else
+                FacingDir = movement.turnRight(FacingDir)
+            end
         end
         TunnelInfo.frameProgress = 1
     else
@@ -201,15 +229,15 @@ function act(dt)
                     end
                 end
             end
-            if TunnelInfo.frameProgress ~= 0 then
-                local has_block, data = turtle.inspect()
-                if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
-                    if not movement.placeBlock() then
-                        pause("Out of placement blocks")
-                        return
-                    end
-                end
-            end
+            -- if TunnelInfo.frameProgress ~= 0 then
+            --     local has_block, data = turtle.inspect()
+            --     if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
+            --         if not movement.placeBlock() then
+            --             pause("Out of placement blocks")
+            --             return
+            --         end
+            --     end
+            -- end
             if TunnelInfo.frameProgress == 0 then
                 if TunnelInfo.frameWAxis == "x" or TunnelInfo.frameWAxis == "z" then
                     FacingDir = movement.turnRight(FacingDir)
@@ -258,6 +286,49 @@ function act(dt)
     saveProgress()
 end
 
+function actStairs()
+    if movement.spareInventoryFull() then
+        local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.originalDir, log)
+        FacingDir = facingDir
+        if not success then
+            pause("Out of chests")
+        end
+    end
+    if TunnelInfo.stepProgress == TunnelInfo.width * TunnelInfo.length then
+        if TunnelInfo.length % 2 == 1 then
+            FacingDir = movement.reverse(FacingDir)
+            for i = 1, TunnelInfo.width - 1 do
+                movement.moveForward()
+            end
+        end
+        TunnelInfo.length = TunnelInfo.length - 1
+        if TunnelInfo.length == 0 then
+            pause("Complete!")
+        end
+        FacingDir = movement.turnToward(FacingDir, movement.oppositeDir(TunnelInfo.originalDir), log)
+        for i = 1, TunnelInfo.length - 1 do
+            movement.moveForward()
+        end
+        FacingDir = movement.turnToward(FacingDir, TunnelInfo.originalDir, log)
+        movement.moveDown()
+        TunnelInfo.stepProgress = 0
+    end
+    if TunnelInfo.stepProgress == 0 then
+        FacingDir = movement.turnRight(FacingDir)
+        TunnelInfo.stepProgress = 1
+    else
+        if TunnelInfo.stepProgress % TunnelInfo.width == 0 then
+            local currentDir = FacingDir
+            FacingDir = movement.turnToward(FacingDir, TunnelInfo.originalDir, log)
+            movement.moveForward()
+            TunnelInfo.stepProgress = TunnelInfo.stepProgress + 1
+            FacingDir = movement.turnToward(FacingDir, movement.oppositeDir(currentDir), log)
+        end
+    end
+    movement.moveForward()
+    TunnelInfo.stepProgress = TunnelInfo.stepProgress + 1
+end
+
 peripheral.find("modem", rednet.open)
 rednet.host(Protocol, os.getComputerLabel())
 
@@ -277,7 +348,11 @@ while true do
     if turtle.getFuelLevel() <= 0 then
         os.pullEvent("turtle_inventory")
     end
-    act(dt)
+    if Function == "stairs" then
+        actStairs()
+    else
+        act(dt)
+    end
     local id, message = rednet.receive(Protocol, 0.1)
     if id then
         if message == "ping" then

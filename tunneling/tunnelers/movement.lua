@@ -168,7 +168,7 @@ local function determineFacingDirection()
     reverse()
     moveForward()
     reverse()
-    if nx ~= nz then
+    if nx ~= x then
         if nx - x == 1 then
             return "+x"
         else
@@ -201,6 +201,7 @@ local function placeBlock()
         return false
     end
     turtle.place()
+    handleBlockPlaceInventory()
     return true
 end
 
@@ -211,6 +212,7 @@ local function placeBlockDown()
         return false
     end
     turtle.placeDown()
+    handleBlockPlaceInventory()
     return true
 end
 
@@ -221,6 +223,7 @@ local function placeBlockUp()
         return false
     end
     turtle.placeUp()
+    handleBlockPlaceInventory()
     return true
 end
 
@@ -274,4 +277,4 @@ local function placeTorch(facingDir, frameDir, log)
     return facingDir, true
 end
 
-return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest, placeTorch = placeTorch }
+return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, oppositeDir = oppositeDir, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest, placeTorch = placeTorch }

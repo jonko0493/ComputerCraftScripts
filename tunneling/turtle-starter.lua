@@ -32,7 +32,7 @@ local startHAxis = args[5]
 
 local torchSpacing = tonumber(args[6])
 
-startInfo = { width = w, height = h, points = points, frameProgress = 0, frameWAxis = startWAxis, frameHAxis = startHAxis, frameDir = nil, currentCurve = 1, curveProgress = 0, torchSpacing = torchSpacing, progress = 0 }
+startInfo = { width = w, height = h, points = points, frameProgress = 0, frameWAxis = startWAxis, frameHAxis = startHAxis, startWAxis = startWAxis, startHAxis = startHAxis, frameDir = nil, currentCurve = 1, curveProgress = 0, torchSpacing = torchSpacing, progress = 0 }
 
 turtleId = rednet.lookup(Protocol, turtleName)
 if turtleId ~= nil then
