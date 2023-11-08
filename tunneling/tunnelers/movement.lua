@@ -3,9 +3,10 @@ local function moveForward()
         turtle.dig()
     end
     if not turtle.forward() then
-        -- something's blocking us, try to clear
+        -- something's blocking us -- most likely this is just a gravity-affected block, so we'll dig until we're clear
+        -- we could also be out of fuel but this is harmless
         repeat
-            turtle.attack()
+            turtle.dig()
         until turtle.forward()
     end
 end
@@ -15,10 +16,8 @@ local function moveUp()
         turtle.digUp()
     end
     if not turtle.up() then
-        -- something's blocking us, try to clear
-        repeat
-            turtle.attack()
-        until turtle.up()
+        -- most likely we're out of fuel
+        return
     end
 end
 
@@ -27,9 +26,8 @@ local function moveDown()
         turtle.digDown()
     end
     if not turtle.down() then
-        repeat
-            turtle.attackDown()
-        until turtle.down()
+        -- most likely we're out of fuel
+        return
     end
 end
 

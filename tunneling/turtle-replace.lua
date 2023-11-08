@@ -1,5 +1,5 @@
 local loglib = require("loglib")
-LogName = "stairs"
+LogName = "replace"
 Protocol = "tunnel"
 
 local function split(inputstr, sep)
@@ -16,24 +16,20 @@ end
 local args = { ... }
 local turtleName = args[1]
 
-local sizeStr = split(args[2], "x")
-local w = tonumber(sizeStr[1])
-local l = tonumber(sizeStr[2])
-
-startInfo = { width = w, length = l, stepProgress = 0, originalDir = nil, progress = 0 }
+startInfo = { location = args[2], itemFilter = args[3], turn = args[4] }
 
 turtleId = rednet.lookup(Protocol, turtleName)
 if turtleId ~= nil then
-    rednet.send(turtleId, "stairs", Protocol)
+    rednet.send(turtleId, "replace", Protocol)
     local readyId, readyMessage = rednet.receive(Protocol, 5)
     if readyMessage == "ready" then
-        rednet.send(turtleId, textutils.serialize(startInfo), "stairs-start")
-        local stairsId, stairsMessage = rednet.receive(Protocol, 5)
-        if stairsMessage == "started" then
-            write("Started building stairs!\n")
+        rednet.send(turtleId, textutils.serialize(startInfo), "replace-start")
+        local replaceId, replaceMessage = rednet.receive(Protocol, 5)
+        if replaceMessage == "started" then
+            write("Started replacing "..args[2].."!\n")
         else
-            if stairsMessage ~= nil then
-                write("Failed: "..stairsMessage.."\n")
+            if replaceMessage ~= nil then
+                write("Failed: "..replaceMessage.."\n")
             else
                 write("Failed nonresponsively!\n")
             end

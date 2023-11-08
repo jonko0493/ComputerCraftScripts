@@ -1,6 +1,7 @@
 local pathing = require("pathing")
 local movement = require("movement")
 local loglib = require("loglib")
+local replace = require("replace")
 
 Protocol = "tunnel"
 Function = "tunnel"
@@ -68,6 +69,11 @@ local function startStairs(stairsMessage)
     TunnelInfo.originalDir = FacingDir
 end
 
+local function startReplace(replaceMessage)
+    TunnelInfo = textutils.unserialize(replaceMessage)
+    Function = "replace"
+end
+
 local function saveProgress()
     local tunnelInfoFile = fs.open("tunnel-info.txt", "w")
     tunnelInfoFile.write(textutils.serialize(TunnelInfo))
@@ -94,7 +100,7 @@ local function pause(statusMessage)
         if message == "logs" then
             sendLogs(id)
         end
-    until message == "resume" or message == "start" or message == "stairs"
+    until message == "resume" or message == "start" or message == "stairs" or message == "replace"
     if message == "resume" then
         rednet.send(id, "resumed", Protocol)
         write("Sent resume message")
@@ -108,14 +114,18 @@ local function pause(statusMessage)
             start(startMessage)
             rednet.send(id, "started", Protocol)
             write("Sent start message")
-        else
-            if message == "stairs" then
-                rednet.send(id, "ready", Protocol)
-                local stairsId, stairsMessage = rednet.receive("stairs-start", 2)
-                startStairs(stairsMessage)
-                rednet.send(id, "started", Protocol)
-                write("Sent start stairs message")
-            end
+        elseif message == "stairs" then
+            rednet.send(id, "ready", Protocol)
+            local stairsId, stairsMessage = rednet.receive("stairs-start", 2)
+            startStairs(stairsMessage)
+            rednet.send(id, "started", Protocol)
+            write("Sent start stairs message")
+        elseif message == "replace" then
+            rednet.send(id, "ready", Protocol)
+            local replaceId, replaceMessage = rednet.receive("replace-start", 2)
+            startReplace(replaceMessage)
+            rednet.send(id, "started", Protocol)
+            write("Sent start replace message")
         end
     end
 end
@@ -206,8 +216,10 @@ function act(dt)
         end
         if TunnelInfo.frameWAxis == "x" or TunnelInfo.frameWAxis == "z" then
             if TunnelInfo.frameWAxis ~= TunnelInfo.startWAxis then
+                log("Frame width axis is "..TunnelInfo.frameWAxis.." which differs from starting "..TunnelInfo.startWAxis.."; turning left...")
                 FacingDir = movement.turnLeft(FacingDir)
             else
+                log("Frame width axis is "..TunnelInfo.frameWAxis.." which is the same as starting "..TunnelInfo.startWAxis.."; turning right...")
                 FacingDir = movement.turnRight(FacingDir)
             end
         end
@@ -350,35 +362,16 @@ while true do
     end
     if Function == "stairs" then
         actStairs()
+    elseif Function == "replace" then
+        local status = replace.act(TunnelInfo.turn, TunnelInfo.location, TunnelInfo.itemFilter)
+        if status == "done" then
+            pause("Complete!")
+        elseif status == "stuck" then
+            pause("Stuck while replacing "..TunnelInfo.location)
+        else
+            TunnelInfo.turn = status
+        end
     else
         act(dt)
-    end
-    local id, message = rednet.receive(Protocol, 0.1)
-    if id then
-        if message == "ping" then
-            rednet.send(id, "alive", Protocol)
-        end
-        if message == "refuel" then
-            refuel(id)
-        end
-        if message ~= nil and string.sub(message, 1, 6) == "update" then
-            doUpdate(id, string.sub(message, 8))
-        end
-        if message == "logs" then
-            sendLogs(id)
-        end
-        if message == "status" then
-            sendStatusMessage(id, Status)
-        end
-        if message == "pause" then
-            rednet.send(id, "paused", Protocol)
-            write("Received pause message; pausing...")
-            pause("Paused")
-        end
-        if message == "stop" then
-            rednet.send(id, "stopped", Protocol)
-            write("Received stop message; shutting down...")
-            os.shutdown()
-        end
     end
 end
