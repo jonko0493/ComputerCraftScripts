@@ -182,8 +182,10 @@ function act(dt)
                 TunnelInfo.frameHAxis = "y"
                 if nextPoint.x - x > 0 then
                     TunnelInfo.frameDir = "+x"
+                    TunnelInfo.prevXDir = "+x"
                 else
                     TunnelInfo.frameDir = "-x"
+                    TunnelInfo.prevXDir = "-x"
                 end
             end
             if nextPoint.x == x and nextPoint.y == y and nextPoint.z ~= z then
@@ -191,8 +193,10 @@ function act(dt)
                 TunnelInfo.frameHAxis = "y"
                 if nextPoint.z - z > 0 then
                     TunnelInfo.frameDir = "+z"
+                    TunnelInfo.prevZDir = "+z"
                 else
                     TunnelInfo.frameDir = "-z"
+                    TunnelInfo.prevZDir = "-z"
                 end
             end
             if nextPoint.x == x and nextPoint.y ~= y and nextPoint.z == z then
@@ -251,7 +255,11 @@ function act(dt)
             --     end
             -- end
             if TunnelInfo.frameProgress == 0 then
-                if TunnelInfo.frameWAxis == "x" or TunnelInfo.frameWAxis == "z" then
+                if TunnelInfo.frameWAxis == "x" and TunnelInfo.prevXDir ~= nil then
+                    FacingDir = movement.turnToward(FacingDir, TunnelInfo.prevXDir, log)
+                elseif  TunnelInfo.frameWAxis == "z" and TunnelInfo.prevZDir ~= nil then
+                    FacingDir = movement.turnToward(FacingDir, TunnelInfo.prevZDir, log)
+                elseif TunnelInfo.frameWAxis ~= "y" then
                     FacingDir = movement.turnRight(FacingDir)
                 end
             else
@@ -357,8 +365,8 @@ end
 pause("Not yet started")
 local dt = 0.001
 while true do
-    if turtle.getFuelLevel() <= 0 then
-        os.pullEvent("turtle_inventory")
+    if turtle.getFuelLevel() <= 6 then
+        pause("Out of fuel!")
     end
     if Function == "stairs" then
         actStairs()

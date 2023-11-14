@@ -118,6 +118,10 @@ local function moveToward(point, facingDir, log)
     if x == point.x and y == point.y and z == point.z then
         return facingDir, true
     end
+    if x == nil then
+        moveForward()
+        return facingDir, false
+    end
     local dx = math.abs(point.x - x)
     local dy = math.abs(point.y - y)
     local dz = math.abs(point.z - z)
@@ -163,9 +167,16 @@ local function determineFacingDirection()
     x, y, z = gps.locate()
     moveForward()
     nx, ny, nz = gps.locate()
-    reverse()
+    FacingDir = reverse(FacingDir)
     moveForward()
-    reverse()
+    FacingDir = reverse(FacingDir)
+    if x == nil or nx == nil then
+        moveForward()
+        determineFacingDirection()
+        FacingDir = reverse(FacingDir)
+        moveForward()
+        FacingDir = reverse(FacingDir)
+    end
     if nx ~= x then
         if nx - x == 1 then
             return "+x"
