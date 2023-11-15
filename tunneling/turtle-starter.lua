@@ -1,4 +1,5 @@
 local loglib = require("loglib")
+local angleslib = require("tunnelers.angles")
 LogName = "starter"
 Protocol = "tunnel"
 
@@ -24,7 +25,7 @@ local points = {}
 local pointsStr = split(args[3], ":")
 for idx, point in pairs(pointsStr) do
     local pointVals = split(point, ",")
-    points[idx] = { x = tonumber(pointVals[1]), y = tonumber(pointVals[2]), z = tonumber(pointVals[3]) }
+    points[idx] = { x = tonumber(pointVals[1]), y = tonumber(pointVals[2]), z = tonumber(pointVals[3]), t = angleslib.angles[pointVals[4]] }
 end
 
 local startWAxis = args[4]

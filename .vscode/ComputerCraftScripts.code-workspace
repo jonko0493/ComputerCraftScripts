@@ -2,10 +2,6 @@
 	"folders": [
 		{
 			"path": ".."
-		},
-		{
-			"name": "JonkoPC",
-			"uri": "craftos-pc://0/"
 		}
 	],
 	"settings": {}

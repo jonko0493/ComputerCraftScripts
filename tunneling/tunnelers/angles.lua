@@ -1,0 +1,19 @@
+angles = {}
+angles["E"] = 0
+angles["SEE"] = 22.5
+angles["SE"] = 45
+angles["SSE"] = 67.5
+angles["S"] = 90
+angles["SSW"] = 112.5
+angles["SW"] = 135
+angles["SWW"] = 157.5
+angles["W"] = 180
+angles["NWW"] = 202.5
+angles["NW"] = 225
+angles["NNW"] = 247.5
+angles["N"] = 270
+angles["NNE"] = 292.5
+angles["NE"] = 315
+angles["NEE"] = 337.5
+
+return { angles = angles }
