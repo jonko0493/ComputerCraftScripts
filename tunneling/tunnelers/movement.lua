@@ -68,16 +68,16 @@ local function turnRight(facingDir)
 end
 
 local function facingDirToDegrees(facingDir)
-    if facingDir == "+x" then
+    if facingDir == "-z" then
         return 0
     end
-    if facingDir == "+z" then
+    if facingDir == "+x" then
         return 90
     end
-    if facingDir == "-x" then
+    if facingDir == "+z" then
         return 180
     end
-    if facingDir == "-z" then
+    if facingDir == "-x" then
         return 270
     end
 end

@@ -1,4 +1,4 @@
-angles = {}
+local angles = {}
 angles["E"] = 0
 angles["SEE"] = 22.5
 angles["SE"] = 45
