@@ -245,15 +245,6 @@ function act(dt)
                     end
                 end
             end
-            -- if TunnelInfo.frameProgress ~= 0 then
-            --     local has_block, data = turtle.inspect()
-            --     if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
-            --         if not movement.placeBlock() then
-            --             pause("Out of placement blocks")
-            --             return
-            --         end
-            --     end
-            -- end
             if TunnelInfo.frameProgress == 0 then
                 if TunnelInfo.frameWAxis == "x" and TunnelInfo.prevXDir ~= nil then
                     FacingDir = movement.turnToward(FacingDir, TunnelInfo.prevXDir, log)
