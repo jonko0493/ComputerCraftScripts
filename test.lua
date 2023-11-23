@@ -3,6 +3,15 @@ local pathing = require("lib.pathing")
 
 local angles = angleslib.angles
 
+TunnelInfo = { width = 5, height = 5, currentCurve = 1 }
+
+Distance = 0
+BlocksCleared = {}
+TargetBlocks = {}
+Target = {}
+
+local INCREMENT = 0.01
+
 local function split(inputstr, sep)
     if sep == nil then
             sep = "%s"
@@ -49,6 +58,50 @@ local function tprint (tbl, indent)
   return toprint
 end
 
+local function tableContainsVector(table, vector)
+    for idx, vec in pairs(table) do
+        if vec.x == vector.x and vec.y == vector.y and vec.z == vector.z then
+            return true
+        end
+    end
+    return false
+end
+
+local function calculateNextTarget()
+    if #TargetBlocks == 0 then
+        local railAngle = pathing.getRailAngle(curves[TunnelInfo.currentCurve], Distance)
+        local pos1 = { x = -0.5, y = 0, z = -TunnelInfo.width / 2 }
+        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos3 = { x = pos1.x + 1, y = pos1.y, z = pos1.z }
+        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        pos1 = pathing.yRot(pos1, railAngle)
+        pos2 = pathing.yRot(pos2, railAngle)
+        pos3 = pathing.yRot(pos3, railAngle)
+        pos4 = pathing.yRot(pos4, railAngle)
+        local actualPos = pathing.getCurvePosAt(Distance, curves[TunnelInfo.currentCurve])
+        pos1 = { x = math.floor(pos1.x + actualPos.x + 0.5), y = math.floor(pos1.y + actualPos.y + 0.5), z = math.floor(pos1.z + actualPos.z + 0.5) }
+        pos2 = { x = math.floor(pos2.x + actualPos.x + 0.5), y = math.floor(pos2.y + actualPos.y + 0.5), z = math.floor(pos2.z + actualPos.z + 0.5) }
+        pos3 = { x = math.floor(pos3.x + actualPos.x + 0.5), y = math.floor(pos3.y + actualPos.y + 0.5), z = math.floor(pos3.z + actualPos.z + 0.5) }
+        pos4 = { x = math.floor(pos4.x + actualPos.x + 0.5), y = math.floor(pos4.y + actualPos.y + 0.5), z = math.floor(pos4.z + actualPos.z + 0.5) }
+        for x = actualPos.x - TunnelInfo.width,actualPos.x + TunnelInfo.width do
+            for y = actualPos.y,actualPos.y + TunnelInfo.height do
+                for z = actualPos.z - TunnelInfo.width,actualPos.z + TunnelInfo.width do
+                    local block = { x = x, y = y, z = z }
+                    if pathing.rectangularPrismContainsPoint(pos1, pos2, pos3, pos4, pos1.y, pos4.y, block) and not tableContainsVector(BlocksCleared, block) then
+                        table.insert(TargetBlocks, block)
+                    end
+                end
+            end
+        end
+    end
+
+    Distance = Distance + INCREMENT
+
+    Target = TargetBlocks[1]
+    table.insert(BlocksCleared, Target)
+    table.remove(TargetBlocks, 1)
+end
+
 for i = 1, #curves do
   print(tprint(curves[i]))
   print(math.abs(curves[i].tEnd1 - curves[i].tStart1) + math.abs(curves[i].tEnd2 - curves[i].tStart2))
@@ -56,4 +109,7 @@ for i = 1, #curves do
     local pos = pathing.getCurvePosAt(j, curves[i])
     print("Curve "..i..", progress "..j..": ("..pos.x..", "..pos.y..", "..pos.z..")")
   end
+  
+  calculateNextTarget()
+  
 end

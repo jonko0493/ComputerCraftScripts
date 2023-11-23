@@ -1,4 +1,5 @@
 local acceptableThreshold = 0.0001
+local DELTA = 1e-10
 
 local function segmentIsCardinal(p1, p2)
     return (p1.x == p2.x and p1.y == p2.y) or (p1.y == p2.y and p1.z == p2.z) or (p1.x == p2.x and p1.z == p2.z)
@@ -255,9 +256,8 @@ local function getCurve(p1, p2)
         end
     end
 
-    return { h1 = h1, k1 = k1, r1 = r1, tStart1 = tStart1, tEnd1 = tEnd1, h2 = h2, k2 = k2, r2 = r2, tStart2 = tStart2, tEnd2 = tEnd2, reverseT1 = reverseT1, reverseT2 = reverseT2, isStraight1 = isStraight1, isStraight2 = isStraight2, y1 = p1.y, y2 = p2.y }
+    return { h1 = h1, k1 = k1, r1 = r1, tStart1 = tStart1, tEnd1 = tEnd1, h2 = h2, k2 = k2, r2 = r2, tStart2 = tStart2, tEnd2 = tEnd2, reverseT1 = reverseT1, reverseT2 = reverseT2, isStraight1 = isStraight1, isStraight2 = isStraight2, y1 = p1.y, y2 = p2.y, length = math.abs(tEnd1 - tStart1) + math.abs(tEnd2 - tStart2) }
 end
-
 local function getCurvesFromPoints(points)
     local curves = {}
 
@@ -312,4 +312,35 @@ local function getCurvePosAt(t, curve)
     end
 end
 
-return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt }
+local function getRailAngle(curve, distance)
+    local pos1 = getCurvePosAt(distance, curve)
+    local pos2 = getCurvePosAt(distance + acceptableThreshold, curve)
+    return math.deg(math.atan(pos2.z - pos1.z, pos2.x - pos1.x))
+end
+
+local function vector(a, b)
+    return { x = b.x - a.x, z = b.z - a.z }
+end
+
+local function dot(u, v)
+    return u.x * v.x + u.z * v.z
+end
+
+local function rectangularPrismContainsPoint(a, b, c, d, y1, y2, m)
+    local ab = vector(a, b)
+    local ac = vector(a, c)
+    local am = vector(a, m)
+    local dotAMAB = dot(am, ab)
+    local dotABAB = dot(ab, ab)
+    local dotAMAC = dot(am, ac)
+    local dotACAC = dot(ac, ac)
+
+    return  m.y - math.min(y1, y2) >= 0
+        and math.max(y1, y2) - m.y >= 0
+        and 0 <= dotAMAB
+        and dotAMAB <= dotABAB
+        and 0 <= dotAMAC
+        and dotAMAC <= dotACAC
+end
+
+return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt, getRailAngle = getRailAngle, rectangularPrismContainsPoint = rectangularPrismContainsPoint, yRot = yRot }

@@ -8,12 +8,19 @@ Function = "tunnel"
 Paused = true
 PauseMessage = "Not yet started"
 Status = "Running"
+Calculating = false
 Preview = false;
 TunnelInfo = {}
 Curves = {}
 FacingDir = nil
 TorchTimer = 0
-Target = { x = 0, y = 0, z = 0 }
+BlocksCleared = {}
+TargetBlocks = {}
+Target = nil
+Distance = 0
+
+local dt = 0.001
+local INCREMENT = 0.005
 
 local function log(message)
     loglib.log("tunnel", message)
@@ -24,6 +31,9 @@ local function sendStatusMessage(recipient)
     local nilCoalescedProgress = 0
     if TunnelInfo.progress ~= nil then
         nilCoalescedProgress = TunnelInfo.progress
+    end
+    if Function == "advanced-tunnel" then
+        nilCoalescedProgress = Distance / Curves[TunnelInfo.currentCurve].length * 100
     end
     local statusMessage
     if Paused then
@@ -61,7 +71,7 @@ end
 
 local function sendLogs(id)
     write("Received logs message; sending logs...\n")
-    logs = fs.open("logs/tunnel.log", "r")
+    local logs = fs.open("logs/tunnel.log", "r")
     rednet.send(id, logs.readAll(), "tunnel-logs")
     logs.close()
 end
@@ -69,9 +79,16 @@ end
 local function start(startMessage)
     TunnelInfo = textutils.unserialize(startMessage)
     Curves = pathing.getCurvesFromPoints(TunnelInfo.points)
-    Function = "tunnel"
+    if TunnelInfo.advanced then
+        Function = "advanced-tunnel"
+    else
+        Function = "tunnel"
+    end
     Paused = false
     Status = "Tunnelling"
+    Target = nil
+    ClearedBlocks = {}
+    Distance = TunnelInfo.startDistance
     log("There are "..#Curves.." curves calculated")
 end
 
@@ -108,16 +125,14 @@ local function pause(statusMessage)
     PauseMessage = statusMessage
 end
 
-local function act(dt)
+local function act()
+    Calculating = true
     if movement.spareInventoryFull() then
         local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.frameDir, log)
         FacingDir = facingDir
         if not success then
             pause("Out of chests")
         end
-    end
-    if TunnelInfo.frameDir == nil then
-        TunnelInfo.frameDir = FacingDir
     end
     local frame = pathing.getCurvePosAt(TunnelInfo.curveProgress, Curves[TunnelInfo.currentCurve])
     log("Frame determined: ("..frame.x..", "..frame.y..", "..frame.z..")")
@@ -273,9 +288,123 @@ local function act(dt)
         TunnelInfo.frameProgress = TunnelInfo.frameProgress + 1
     end
     saveProgress()
+    Calculating = false
+end
+
+-- local function calculateNextTarget()
+--     local startTime = os.clock()
+--     while (os.clock() - startTime < 0.002) do
+--         local pos1 = pathing.getCurvePosAt(Distance, Curves[TunnelInfo.currentCurve])
+--         Distance = Distance + INCREMENT
+--         local pos2 = pathing.getCurvePosAt(Distance, Curves[TunnelInfo.currentCurve])
+--         local vec3 = { x = pos2.x - pos1.x, y = 0, z = pos2.z - pos1.z }
+--         local d = math.sqrt(vec3.x * vec3.x + vec3.y * vec3.y + vec3.z * vec3.z)
+--         vec3 = { x = vec3.x / d, y = vec3.y / d, z = vec3.z / d }
+--         vec3 = pathing.yRot(vec3, math.pi / 2)
+
+--         for x = -TunnelInfo.width,TunnelInfo.width,INCREMENT do
+--             local editPos = { x = pos1.x + vec3.x * x, y = pos1.y, z = pos1.z + vec3.z * x }
+--             local wholeNumber = math.floor(editPos.y) == math.ceil(editPos.y)
+--             if (math.abs(x) > TunnelInfo.width - INCREMENT) then
+--                 for y = 0,TunnelInfo.height do
+--                     if y < TunnelInfo.height and not wholeNumber then
+--                         Target = { x = editPos.x, y = editPos + y, z = editPos.z }
+--                     end
+--                 end
+--             else
+--                 local yAdjust = TunnelInfo.height
+--                 if wholeNumber then
+--                     yAdjust = TunnelInfo.height - 1
+--                 end
+--                 Target = { x = editPos.x, y = editPos.y + math.max(0, yAdjust), z = editPos.z }
+--             end
+--         end
+
+--         if Curves[TunnelInfo.currentCurve].length - Distance < INCREMENT then
+--             return true
+--         end
+--     end
+
+--     return false
+-- end
+
+local function tableContainsVector(table, vector)
+    for idx, vec in pairs(table) do
+        if vec.x == vector.x and vec.y == vector.y and vec.z == vector.z then
+            return true
+        end
+    end
+    return false
+end
+
+local function calculateNextTarget()
+    if #TargetBlocks == 0 then
+        log(Distance)
+        local railAngle = pathing.getRailAngle(Curves[TunnelInfo.currentCurve], Distance)
+        local pos1 = { x = -0.5, y = 0, z = -TunnelInfo.width / 2 }
+        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos3 = { x = pos1.x + 1, y = pos1.y, z = pos1.z }
+        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        pos1 = pathing.yRot(pos1, railAngle)
+        pos2 = pathing.yRot(pos2, railAngle)
+        pos3 = pathing.yRot(pos3, railAngle)
+        pos4 = pathing.yRot(pos4, railAngle)
+        local actualPos = pathing.getCurvePosAt(Distance, Curves[TunnelInfo.currentCurve])
+        pos1 = { x = math.floor(pos1.x + actualPos.x + 0.5), y = math.floor(pos1.y + actualPos.y + 0.5), z = math.floor(pos1.z + actualPos.z + 0.5) }
+        pos2 = { x = math.floor(pos2.x + actualPos.x + 0.5), y = math.floor(pos2.y + actualPos.y + 0.5), z = math.floor(pos2.z + actualPos.z + 0.5) }
+        pos3 = { x = math.floor(pos3.x + actualPos.x + 0.5), y = math.floor(pos3.y + actualPos.y + 0.5), z = math.floor(pos3.z + actualPos.z + 0.5) }
+        pos4 = { x = math.floor(pos4.x + actualPos.x + 0.5), y = math.floor(pos4.y + actualPos.y + 0.5), z = math.floor(pos4.z + actualPos.z + 0.5) }
+        for x = actualPos.x - TunnelInfo.width,actualPos.x + TunnelInfo.width do
+            for y = actualPos.y,actualPos.y + TunnelInfo.height do
+                for z = actualPos.z - TunnelInfo.width,actualPos.z + TunnelInfo.width do
+                    local block = { x = x, y = y, z = z }
+                    if pathing.rectangularPrismContainsPoint(pos1, pos2, pos3, pos4, pos1.y, pos4.y, block) and not tableContainsVector(BlocksCleared, block) then
+                        table.insert(TargetBlocks, block)
+                    end
+                end
+            end
+        end
+        Distance = Distance + INCREMENT
+    end
+
+    Target = TargetBlocks[1]
+    table.insert(BlocksCleared, Target)
+    table.remove(TargetBlocks, 1)
+end
+
+local function advancedTunnel()
+    Calculating = true
+    if movement.spareInventoryFull() then
+        local facingDir, success = movement.placeChest(FacingDir, FacingDir, log)
+        FacingDir = facingDir
+        if not success then
+            pause("Out of chests")
+        end
+    end
+    if Target == nil then
+        calculateNextTarget()
+        if Target == nil and Distance >= Curves[TunnelInfo.currentCurve].length then
+            pause("Complete")
+            return
+        end
+    end
+    if Target ~= nil then
+        log(Target.x..", "..Target.y..", "..Target.z)
+        local newFacingDir, arrived = movement.moveToward(Target, FacingDir, log)
+        FacingDir = newFacingDir
+        if arrived then
+            calculateNextTarget()
+            if Target == nil and Distance >= Curves[TunnelInfo.currentCurve].length then
+                pause("Complete")
+                return
+            end
+        end
+    end
+    Calculating = false
 end
 
 local function actStairs()
+    Calculating = true
     if movement.spareInventoryFull() then
         local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.originalDir, log)
         FacingDir = facingDir
@@ -316,6 +445,7 @@ local function actStairs()
     end
     movement.moveForward()
     TunnelInfo.stepProgress = TunnelInfo.stepProgress + 1
+    Calculating = false
 end
 
 local function poll()
@@ -370,10 +500,15 @@ local function poll()
         rednet.send(id, "started", Protocol)
         write("Sent start goto message")
     end
+    -- there are some routines that if interrupted destroy state 
+    -- chest placement is one of those
+    -- we need to allow those to finish
+    while Calculating do
+        sleep(1)
+    end
 end
 
 local function decide()
-    local dt = 0.001
     if Paused then
         sleep(1)
         return
@@ -384,6 +519,7 @@ local function decide()
     if Function == "stairs" then
         actStairs()
     elseif Function == "replace" then
+        Calculating = true
         local status = replace.act(TunnelInfo.turn, TunnelInfo.location, TunnelInfo.itemFilter)
         if status == "done" then
             pause("Complete!")
@@ -392,10 +528,15 @@ local function decide()
         else
             TunnelInfo.turn = status
         end
+        Calculating = false
     elseif Function == "goto" then
+        Calculating = true
         FacingDir = movement.moveToward(Target, FacingDir, log)
+        Calculating = false
+    elseif Function == "advanced-tunnel" then
+        advancedTunnel()
     else
-        act(dt)
+        act()
     end
 end
 

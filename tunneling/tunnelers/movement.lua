@@ -82,6 +82,26 @@ local function facingDirToDegrees(facingDir)
     end
 end
 
+local function degreesToFacingDir(degrees)
+    if degrees < 0 then
+        degrees = degrees + 360
+    elseif degrees >= 360 then
+        degrees = degrees - 360
+    end
+    if degrees == 0 then
+        return "-z"
+    end
+    if degrees == 90 then
+        return "+x"
+    end
+    if degrees == 180 then
+        return "+z"
+    end
+    if degrees == 270 then
+        return "-x"
+    end
+end
+
 local function turnToward(currentDir, targetDir, log)
     if currentDir == targetDir then
         return currentDir
@@ -250,7 +270,7 @@ end
 
 local function placeChest(facingDir, frameDir, log)
     local originalDir = facingDir
-    if turtle.getItemCount(1) == 0 then
+    if turtle.getItemCount(1) == 0 or turtle.getItemDetail(1).name ~= "minecraft:chest" then
         return facingDir, false
     end
     facingDir = turnToward(facingDir, oppositeDir(frameDir), log)
@@ -286,4 +306,4 @@ local function placeTorch(facingDir, frameDir, log)
     return facingDir, true
 end
 
-return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, oppositeDir = oppositeDir, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest, placeTorch = placeTorch }
+return { moveForward = moveForward, moveDown = moveDown, moveUp = moveUp, determineFacingDirection = determineFacingDirection, facingDirToDegrees = facingDirToDegrees, degreesToFacingDir = degreesToFacingDir, turnLeft = turnLeft, turnRight = turnRight, reverse = reverse, oppositeDir = oppositeDir, turnToward = turnToward, moveToward = moveToward, placeBlock = placeBlock, placeBlockDown = placeBlockDown, placeBlockUp = placeBlockUp, spareInventoryFull = spareInventoryFull, placeChest = placeChest, placeTorch = placeTorch }

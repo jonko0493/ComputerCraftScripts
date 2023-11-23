@@ -34,13 +34,21 @@ local startHAxis = args[5]
 local torchSpacing = tonumber(args[6])
 
 local currentCurve
+local advanced = false
+local startDistance = 0
 if args[7] == nil then
     currentCurve = 1
+elseif args[7] == "advanced" then
+    currentCurve = 1
+    advanced = true
+    if args[8] ~= nil then
+        startDistance = tonumber(args[8])
+    end
 else
     currentCurve = tonumber(args[7])
 end
 
-startInfo = { width = w, height = h, points = points, frameProgress = 0, frameWAxis = startWAxis, frameHAxis = startHAxis, startWAxis = startWAxis, startHAxis = startHAxis, prevXDir = nil, prevZDir = nil, frameDir = nil, currentCurve = currentCurve, curveProgress = 0, torchSpacing = torchSpacing, progress = 0 }
+startInfo = { width = w, height = h, points = points, frameProgress = 0, frameWAxis = startWAxis, frameHAxis = startHAxis, startWAxis = startWAxis, startHAxis = startHAxis, prevXDir = nil, prevZDir = nil, frameDir = nil, currentCurve = currentCurve, advanced = advanced, curveProgress = 0, torchSpacing = torchSpacing, progress = 0, startDistance = startDistance }
 
 turtleId = rednet.lookup(Protocol, turtleName)
 if turtleId ~= nil then
