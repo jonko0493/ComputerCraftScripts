@@ -1,5 +1,3 @@
-local bezier = require("bezier")
-
 local acceptableThreshold = 0.0001
 
 local function segmentIsCardinal(p1, p2)
@@ -33,12 +31,20 @@ local function getCardinalVector(dir, mag)
     end
 end
 
+local function getOppositeAngle(t)
+    local opposite = 180 - t
+    if opposite < 0 then
+        opposite = opposite + 360
+    end
+    return opposite
+end
+
 local function getMagnitude(p1, p2)
     return math.sqrt((p1.x - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 + (p1.z - p2.z) ^ 2)
 end
 
 local function isParallel(p1, p2)
-    return math.abs(180 - p1.t) == math.abs(180 - p2.t)
+    return (math.abs(180 - p1.t) == math.abs(180 - p2.t)) or (math.abs(180 - p1.t) == math.abs(getOppositeAngle(180 - p2.t)))
 end
 
 local function yRot(vec, yaw)
@@ -50,16 +56,8 @@ local function yRot(vec, yaw)
     return { x = d, y = e, z = h, t = 0 }
 end
 
-local function getOppositeAngle(t)
-    local opposite = 180 - t
-    if opposite < 0 then
-        opposite = opposite + 360
-    end
-    return opposite
-end
-
 local function getTBounds1(x, h, z, k, r)
-    return math.atan(z - k, x - h) * r
+    return math.atan2(z - k, x - h) * r
 end
 
 local function getTBounds(x, h, z, k, r, tStart, reverse)
@@ -294,20 +292,20 @@ local function getCurvePosAt(t, curve)
     local y = curve.y1
 
     if value <= count1 then
-        local t = 1
+        local tloc = 1
         if curve.reverseT1 then
-            t = -1
+            tloc = -1
         end
-        local pos = getPositionXZ(curve.h1, curve.k1, curve.r1, t * value + curve.tStart1, 0, curve.isStraight1, y)
+        local pos = getPositionXZ(curve.h1, curve.k1, curve.r1, tloc * value + curve.tStart1, 0, curve.isStraight1, y)
         pos.x = math.floor(pos.x + 0.5)
         pos.z = math.floor(pos.z + 0.5)
         return pos
     else
-        local t = 1
+        local tloc = 1
         if curve.reverseT2 then
-            t = -1
+            tloc = -1
         end
-        local pos = getPositionXZ(curve.h2, curve.k2, curve.r2, t * (value - count1) + curve.tStart2, 0, curve.isStraight2, y)
+        local pos = getPositionXZ(curve.h2, curve.k2, curve.r2, tloc * (value - count1) + curve.tStart2, 0, curve.isStraight2, y)
         pos.x = math.floor(pos.x + 0.5)
         pos.z = math.floor(pos.z + 0.5)
         return pos

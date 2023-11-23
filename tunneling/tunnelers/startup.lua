@@ -5,23 +5,33 @@ local replace = require("replace")
 
 Protocol = "tunnel"
 Function = "tunnel"
+Paused = true
+PauseMessage = "Not yet started"
 Status = "Running"
+Preview = false;
 TunnelInfo = {}
 Curves = {}
 FacingDir = nil
 TorchTimer = 0
+Target = { x = 0, y = 0, z = 0 }
 
 local function log(message)
     loglib.log("tunnel", message)
 end
 
-local function sendStatusMessage(recipient, status)
+local function sendStatusMessage(recipient)
     local x, y, z = gps.locate()
     local nilCoalescedProgress = 0
     if TunnelInfo.progress ~= nil then
         nilCoalescedProgress = TunnelInfo.progress
     end
-    rednet.send(recipient, textutils.serialize({ name = os.getComputerLabel(), x = x, y = y, z = z, fuel = turtle.getFuelLevel(), maxFuel = turtle.getFuelLimit(), progress = nilCoalescedProgress, status = status, facingDir = FacingDir }), Protocol)
+    local statusMessage
+    if Paused then
+        statusMessage = PauseMessage
+    else
+        statusMessage = Status
+    end
+    rednet.send(recipient, textutils.serialize({ name = os.getComputerLabel(), x = x, y = y, z = z, fuel = turtle.getFuelLevel(), maxFuel = turtle.getFuelLimit(), progress = nilCoalescedProgress, status = statusMessage, facingDir = FacingDir, route = Curves, preview = Preview }), Protocol)
 end
 
 local function refuel(id)
@@ -60,18 +70,31 @@ local function start(startMessage)
     TunnelInfo = textutils.unserialize(startMessage)
     Curves = pathing.getCurvesFromPoints(TunnelInfo.points)
     Function = "tunnel"
+    Paused = false
+    Status = "Tunnelling"
     log("There are "..#Curves.." curves calculated")
 end
 
 local function startStairs(stairsMessage)
     TunnelInfo = textutils.unserialize(stairsMessage)
     Function = "stairs"
+    Paused = false
+    Status = "Building stairs"
     TunnelInfo.originalDir = FacingDir
 end
 
 local function startReplace(replaceMessage)
     TunnelInfo = textutils.unserialize(replaceMessage)
     Function = "replace"
+    Status = "Replacing blocks"
+    Paused = false
+end
+
+local function startGoto(gotoMessage)
+    Target = textutils.unserialize(gotoMessage)
+    Function = "goto"
+    Status = "Navigating to ("..Target.x..", "..Target.y..", "..Target.z..")"
+    Paused = false
 end
 
 local function saveProgress()
@@ -81,56 +104,11 @@ local function saveProgress()
 end
 
 local function pause(statusMessage)
-    local id = 0
-    local message = nil
-    repeat
-        id, message = rednet.receive(Protocol, 0.1)
-        if message == "ping" then
-            rednet.send(id, "alive", Protocol)
-        end
-        if message == "refuel" then
-            refuel(id)
-        end
-        if message == "status" then
-            sendStatusMessage(id, statusMessage)
-        end
-        if message ~= nil and string.sub(message, 1, 6) == "update" then
-            doUpdate(id, string.sub(message, 8))
-        end
-        if message == "logs" then
-            sendLogs(id)
-        end
-    until message == "resume" or message == "start" or message == "stairs" or message == "replace"
-    if message == "resume" then
-        rednet.send(id, "resumed", Protocol)
-        write("Sent resume message")
-    else
-        if message == "start" then
-            rednet.send(id, "ready", Protocol)
-            local startId, startMessage = rednet.receive("tunnel-start", 2)
-            local tunnelInfoFile = fs.open("tunnel-info.txt", "w")
-            tunnelInfoFile.write(startMessage)
-            tunnelInfoFile.close()
-            start(startMessage)
-            rednet.send(id, "started", Protocol)
-            write("Sent start message")
-        elseif message == "stairs" then
-            rednet.send(id, "ready", Protocol)
-            local stairsId, stairsMessage = rednet.receive("stairs-start", 2)
-            startStairs(stairsMessage)
-            rednet.send(id, "started", Protocol)
-            write("Sent start stairs message")
-        elseif message == "replace" then
-            rednet.send(id, "ready", Protocol)
-            local replaceId, replaceMessage = rednet.receive("replace-start", 2)
-            startReplace(replaceMessage)
-            rednet.send(id, "started", Protocol)
-            write("Sent start replace message")
-        end
-    end
+    Paused = true
+    PauseMessage = statusMessage
 end
 
-function act(dt)
+local function act(dt)
     if movement.spareInventoryFull() then
         local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.frameDir, log)
         FacingDir = facingDir
@@ -297,7 +275,7 @@ function act(dt)
     saveProgress()
 end
 
-function actStairs()
+local function actStairs()
     if movement.spareInventoryFull() then
         local facingDir, success = movement.placeChest(FacingDir, TunnelInfo.originalDir, log)
         FacingDir = facingDir
@@ -340,22 +318,66 @@ function actStairs()
     TunnelInfo.stepProgress = TunnelInfo.stepProgress + 1
 end
 
-peripheral.find("modem", rednet.open)
-rednet.host(Protocol, os.getComputerLabel())
-
-if fs.exists("tunnel-info.txt") then
-    local tunnelInfoFile = fs.open("tunnel-info.txt", "r")
-    start(tunnelInfoFile.readAll())
-    tunnelInfoFile.close()
+local function poll()
+    id, message = rednet.receive(Protocol, 2)
+    if message == "ping" then
+        rednet.send(id, "alive", Protocol)
+    elseif message == "refuel" then
+        refuel(id)
+    elseif message == "status" then
+        sendStatusMessage(id)
+    elseif message == "preview" then 
+        rednet.send(id, "Toggled preview", Protocol)
+        Preview = not Preview
+        write("Sent preview message")
+    elseif message ~= nil and string.sub(message, 1, 6) == "update" then
+        doUpdate(id, string.sub(message, 8))
+    elseif message == "logs" then
+        sendLogs(id)
+    elseif message == "pause" then
+        rednet.send(id, "paused", Protocol)
+        pause("Paused")
+        write("Sent pause message")
+    elseif message == "resume" then
+        rednet.send(id, "resumed", Protocol)
+        Paused = false
+        write("Sent resume message")
+    elseif message == "start" then
+        rednet.send(id, "ready", Protocol)
+        local startId, startMessage = rednet.receive("tunnel-start", 2)
+        local tunnelInfoFile = fs.open("tunnel-info.txt", "w")
+        tunnelInfoFile.write(startMessage)
+        tunnelInfoFile.close()
+        start(startMessage)
+        rednet.send(id, "started", Protocol)
+        write("Sent start message")
+    elseif message == "stairs" then
+        rednet.send(id, "ready", Protocol)
+        local stairsId, stairsMessage = rednet.receive("stairs-start", 2)
+        startStairs(stairsMessage)
+        rednet.send(id, "started", Protocol)
+        write("Sent start stairs message")
+    elseif message == "replace" then
+        rednet.send(id, "ready", Protocol)
+        local replaceId, replaceMessage = rednet.receive("replace-start", 2)
+        startReplace(replaceMessage)
+        rednet.send(id, "started", Protocol)
+        write("Sent start replace message")
+    elseif message == "goto" then
+        rednet.send(id, "ready", Protocol)
+        local gotoId, gotoMessage = rednet.receive("goto-start", 2)
+        startGoto(gotoMessage)
+        rednet.send(id, "started", Protocol)
+        write("Sent start goto message")
+    end
 end
 
-if FacingDir == nil then
-    FacingDir = movement.determineFacingDirection()
-end
-
-pause("Not yet started")
-local dt = 0.001
-while true do
+local function decide()
+    local dt = 0.001
+    if Paused then
+        sleep(1)
+        return
+    end
     if turtle.getFuelLevel() <= 6 then
         pause("Out of fuel!")
     end
@@ -370,7 +392,29 @@ while true do
         else
             TunnelInfo.turn = status
         end
+    elseif Function == "goto" then
+        FacingDir = movement.moveToward(Target, FacingDir, log)
     else
         act(dt)
     end
+end
+
+-- Start
+
+peripheral.find("modem", rednet.open)
+rednet.host(Protocol, os.getComputerLabel())
+
+if fs.exists("tunnel-info.txt") then
+    local tunnelInfoFile = fs.open("tunnel-info.txt", "r")
+    start(tunnelInfoFile.readAll())
+    tunnelInfoFile.close()
+end
+
+if FacingDir == nil then
+    FacingDir = movement.determineFacingDirection()
+end
+
+pause("Not yet started")
+while true do
+    parallel.waitForAny(poll, decide)
 end

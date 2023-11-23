@@ -1,4 +1,5 @@
 local loglib = require("loglib")
+local pathing = require("pathing")
 LogName = "turtle-monitor"
 Protocol = "tunnel"
 
@@ -18,7 +19,8 @@ local function turtleIsKnown(id)
 end
 
 local function addTurtle(id, w)
-    table.insert(Turtles, { id = id, name = "", x = 0, y = 0, z = 0, fuel = 0, maxFuel = 1, progress = 0, status = "Unknown", lastMessageReceived = os.epoch() / 72000 })
+    local randColor = "#"..string.format("%02x", math.random(0, 255))..string.format("%02x", math.random(0, 255))..string.format("%02x", math.random(0, 255))
+    table.insert(Turtles, { id = id, name = "", color = randColor, x = 0, y = 0, z = 0, fuel = 0, maxFuel = 1, progress = 0, status = "Unknown", route = {}, preview = false, lastMessageReceived = os.epoch() / 72000 })
     loglib.log(LogName, "Added turtle "..id..". There are now "..#Turtles.." turtles.")
 end
 
@@ -42,31 +44,51 @@ local function updateTurtle(id, turtleData)
     Turtles[idx].maxFuel = turtleData.maxFuel
     Turtles[idx].progress = turtleData.progress
     Turtles[idx].status = turtleData.status
+    Turtles[idx].route = turtleData.route
+    Turtles[idx].preview = turtleData.preview
     Turtles[idx].lastMessageReceived = os.epoch() / 72000
 end
 
-peripheral.find("modem", rednet.open)
-local monitor = peripheral.find("monitor")
-monitor.clear()
-local w, h = monitor.getSize()
+local function contains(table, value)
+    for key, val in ipairs(table) do
+        if val == value then
+            return true
+        end
+    end
 
-term.redirect(monitor)
-paintutils.drawFilledBox(0, 0, w, h, colors.black)
-paintutils.drawFilledBox(w / 2 - 8, h / 2 - 4, w / 2 + 8, h / 2 + 4, colors.red)
-for i=1,3 do
-    paintutils.drawLine(w / 2 + i - 1, h / 2 - (i - 3), w / 2 + i - 1, h / 2 + (i - 3), colors.white)
+    return false
 end
 
-repeat
-    local event, side, x, y = os.pullEvent("monitor_touch")
-until x >= w / 2 - 8 and x <= w / 2 + 8 and y >= h / 2 - 4 and y <= h / 2 + 4
+peripheral.find("modem", rednet.open)
+-- local monitor = peripheral.find("monitor")
+-- monitor.clear()
+-- local w, h = monitor.getSize()
 
-term.clear()
-local scale = 1.5
-monitor.setTextScale(scale)
-paintutils.drawFilledBox(0, 0, w, h, colors.black)
-term.setBackgroundColor(colors.black)
-term.setTextColor(colors.white)
+-- term.redirect(monitor)
+-- paintutils.drawFilledBox(0, 0, w, h, colors.black)
+-- paintutils.drawFilledBox(w / 2 - 8, h / 2 - 4, w / 2 + 8, h / 2 + 4, colors.red)
+-- for i=1,3 do
+--     paintutils.drawLine(w / 2 + i - 1, h / 2 - (i - 3), w / 2 + i - 1, h / 2 + (i - 3), colors.white)
+-- end
+
+-- repeat
+--     local event, side, x, y = os.pullEvent("monitor_touch")
+-- until x >= w / 2 - 8 and x <= w / 2 + 8 and y >= h / 2 - 4 and y <= h / 2 + 4
+
+-- term.clear()
+-- local scale = 1.5
+-- monitor.setTextScale(scale)
+-- paintutils.drawFilledBox(0, 0, w, h, colors.black)
+-- term.setBackgroundColor(colors.black)
+-- term.setTextColor(colors.white)
+
+local cart = peripheral.find("cartographer")
+if not contains(cart.getMarkerSets(), "turtles") then
+    cart.addMarkerSet("turtles", "Turtles")
+end
+if not contains(cart.getMarkerSets(), "turtlePreviews") then
+    cart.addMarkerSet("turtlePreviews", "Tunneling Routes")
+end
 
 while true do
     local clients = { rednet.lookup(Protocol) }
@@ -86,52 +108,68 @@ while true do
                 local progressData = textutils.unserialize(message)
                 updateTurtle(id, progressData)
             end
+
+            cart.removeMarker("turtles", "turtle"..tunnelTurtle.id)
+            cart.removeMarker("turtlePreviews", "turtle"..tunnelTurtle.id.."preview")
+            cart.addPOIMarker("turtles", "turtle"..tunnelTurtle.id, tunnelTurtle.name, tunnelTurtle.status..": "..tunnelTurtle.progress.."% \n"..tunnelTurtle.fuel.." / "..tunnelTurtle.maxFuel, tunnelTurtle.x, tunnelTurtle.y, tunnelTurtle.z, "https://www.computercraft.info/wiki/images/8/85/Grid_turtle.png")
+
+            if (tunnelTurtle.preview) then
+                local previewPoints = {}
+                for curveIdx, curve in pairs(tunnelTurtle.route) do
+                    for t = 0,1,0.05 do
+                        table.insert(previewPoints, pathing.getCurvePosAt(t, curve))
+                    end
+                end
+                cart.addLineMarker("turtlePreviews", "turtle"..tunnelTurtle.id.."preview", tunnelTurtle.name.." Route Preview", tunnelTurtle.name.." Route Preview", tunnelTurtle.color, 0.75, 3, previewPoints)
+            end
+
+            -- -- Clear section of screen
+            -- paintutils.drawFilledBox(0, 8 * (idx - 1), w, 8 * (idx - 1) + 7, colors.black)
+
+            -- -- Draw name and status
+            -- term.setBackgroundColor(colors.black)
+            -- term.setTextColor(colors.white)
+            -- term.setCursorPos(2, 8 * (idx - 1) + 1)
+            -- term.write(tunnelTurtle.name)
+            -- term.setCursorPos(w / 2, 8 * (idx - 1) + 1)
+            -- if message == nil then
+            --     term.write("Offline")
+            -- else
+            --     term.write(tunnelTurtle.status)
+            -- end
+
+            -- -- Draw fuel bar
+            -- paintutils.drawBox(2, 8 * (idx - 1) + 2, w / 2 - 2, 8 * (idx - 1) + 4, colors.white)
+            -- term.setCursorPos(3, 8 * (idx - 1) + 2)
+            -- term.setTextColor(colors.black) 
+            -- term.setBackgroundColor(colors.white)
+            -- term.write("Fuel")
+
+            -- local lineColor = colors.lime
+            -- if tunnelTurtle.fuel / tunnelTurtle.maxFuel <= 0.4 then
+            --     lineColor = colors.yellow
+            -- end
+            -- if tunnelTurtle.fuel / tunnelTurtle.maxFuel <= 0.15 then
+            --     lineColor = colors.red
+            -- end
+            -- paintutils.drawLine(3, 8 * (idx - 1) + 3, (w / 2 - 6) * (tunnelTurtle.fuel / tunnelTurtle.maxFuel) + 3, 8 * (idx - 1) + 3, lineColor)
+
+            -- -- Draw progress bar
+            -- paintutils.drawBox(w / 2, 8 * (idx - 1) + 2, w - 2, 8 * (idx - 1) + 4, colors.white)
+            -- term.setCursorPos(w / 2 + 1, 8 * (idx - 1) + 2)
+            -- term.setTextColor(colors.black) 
+            -- term.setBackgroundColor(colors.white)
+            -- term.write("Progress")
+
+            -- paintutils.drawLine(w / 2 + 1, 8 * (idx - 1) + 3, (w / 2 - 4) * tunnelTurtle.progress + w / 2 + 1, 8 * (idx - 1) + 3, colors.cyan)
             
-            -- Clear section of screen
-            paintutils.drawFilledBox(0, 8 * (idx - 1), w, 8 * (idx - 1) + 7, colors.black)
-
-            -- Draw name and status
-            term.setBackgroundColor(colors.black)
-            term.setTextColor(colors.white)
-            term.setCursorPos(2, 8 * (idx - 1) + 1)
-            term.write(tunnelTurtle.name)
-            term.setCursorPos(w / 2, 8 * (idx - 1) + 1)
-            if message == nil then
-                term.write("Offline")
-            else
-                term.write(tunnelTurtle.status)
-            end
-
-            -- Draw fuel bar
-            paintutils.drawBox(2, 8 * (idx - 1) + 2, w / 2 - 2, 8 * (idx - 1) + 4, colors.white)
-            term.setCursorPos(3, 8 * (idx - 1) + 2)
-            term.setTextColor(colors.black) 
-            term.setBackgroundColor(colors.white)
-            term.write("Fuel")
-
-            local lineColor = colors.lime
-            if tunnelTurtle.fuel / tunnelTurtle.maxFuel <= 0.4 then
-                lineColor = colors.yellow
-            end
-            if tunnelTurtle.fuel / tunnelTurtle.maxFuel <= 0.15 then
-                lineColor = colors.red
-            end
-            paintutils.drawLine(3, 8 * (idx - 1) + 3, (w / 2 - 6) * (tunnelTurtle.fuel / tunnelTurtle.maxFuel) + 3, 8 * (idx - 1) + 3, lineColor)
-
-            -- Draw progress bar
-            paintutils.drawBox(w / 2, 8 * (idx - 1) + 2, w - 2, 8 * (idx - 1) + 4, colors.white)
-            term.setCursorPos(w / 2 + 1, 8 * (idx - 1) + 2)
-            term.setTextColor(colors.black) 
-            term.setBackgroundColor(colors.white)
-            term.write("Progress")
-
-            paintutils.drawLine(w / 2 + 1, 8 * (idx - 1) + 3, (w / 2 - 4) * tunnelTurtle.progress + w / 2 + 1, 8 * (idx - 1) + 3, colors.cyan)
-            
-            -- Write current location
-            term.setBackgroundColor(colors.black)
-            term.setTextColor(colors.white)
-            term.setCursorPos(2, 8 * (idx - 1) + 6)
-            term.write("("..tunnelTurtle.x..", "..tunnelTurtle.y..", "..tunnelTurtle.z..")")
+            -- -- Write current location
+            -- term.setBackgroundColor(colors.black)
+            -- term.setTextColor(colors.white)
+            -- term.setCursorPos(2, 8 * (idx - 1) + 6)
+            -- term.write("("..tunnelTurtle.x..", "..tunnelTurtle.y..", "..tunnelTurtle.z..")")
         end
     end
+
+    sleep(5)
 end
