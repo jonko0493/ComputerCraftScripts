@@ -23,7 +23,7 @@ local function split(inputstr, sep)
     return t
 end
 
-local pointsArg = "-16,121,3,W:39,121,174,E"
+local pointsArg = "-687,-1,67,W:-1197,-1,-567,E"
 local points = {}
 local pointsStr = split(pointsArg, ":")
 for idx, point in pairs(pointsStr) do
@@ -70,10 +70,11 @@ end
 local function calculateNextTarget()
     if #TargetBlocks == 0 then
         local railAngle = pathing.getRailAngle(curves[TunnelInfo.currentCurve], Distance)
+        print(Distance..": "..railAngle)
         local pos1 = { x = -0.5, y = 0, z = -TunnelInfo.width / 2 }
-        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height - 1, z = pos1.z + TunnelInfo.width }
         local pos3 = { x = pos1.x + 1, y = pos1.y, z = pos1.z }
-        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height - 1, z = pos1.z + TunnelInfo.width }
         pos1 = pathing.yRot(pos1, railAngle)
         pos2 = pathing.yRot(pos2, railAngle)
         pos3 = pathing.yRot(pos3, railAngle)
@@ -93,9 +94,8 @@ local function calculateNextTarget()
                 end
             end
         end
+        Distance = Distance + INCREMENT
     end
-
-    Distance = Distance + INCREMENT
 
     Target = TargetBlocks[1]
     table.insert(BlocksCleared, Target)
@@ -110,6 +110,7 @@ for i = 1, #curves do
     print("Curve "..i..", progress "..j..": ("..pos.x..", "..pos.y..", "..pos.z..")")
   end
   
+  Distance = 0.10
   calculateNextTarget()
   
 end

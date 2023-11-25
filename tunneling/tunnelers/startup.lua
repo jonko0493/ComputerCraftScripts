@@ -20,7 +20,7 @@ Target = nil
 Distance = 0
 
 local dt = 0.001
-local INCREMENT = 0.005
+local INCREMENT = 0.0005
 
 local function log(message)
     loglib.log("tunnel", message)
@@ -33,7 +33,7 @@ local function sendStatusMessage(recipient)
         nilCoalescedProgress = TunnelInfo.progress
     end
     if Function == "advanced-tunnel" then
-        nilCoalescedProgress = Distance / Curves[TunnelInfo.currentCurve].length * 100
+        nilCoalescedProgress = Distance * 100
     end
     local statusMessage
     if Paused then
@@ -342,9 +342,9 @@ local function calculateNextTarget()
         log(Distance)
         local railAngle = pathing.getRailAngle(Curves[TunnelInfo.currentCurve], Distance)
         local pos1 = { x = -0.5, y = 0, z = -TunnelInfo.width / 2 }
-        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos2 = { x = pos1.x, y = pos1.y + TunnelInfo.height - 1, z = pos1.z + TunnelInfo.width }
         local pos3 = { x = pos1.x + 1, y = pos1.y, z = pos1.z }
-        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height, z = pos1.z + TunnelInfo.width }
+        local pos4 = { x = pos1.x + 1, y = pos1.y + TunnelInfo.height - 1, z = pos1.z + TunnelInfo.width }
         pos1 = pathing.yRot(pos1, railAngle)
         pos2 = pathing.yRot(pos2, railAngle)
         pos3 = pathing.yRot(pos3, railAngle)
@@ -383,7 +383,7 @@ local function advancedTunnel()
     end
     if Target == nil then
         calculateNextTarget()
-        if Target == nil and Distance >= Curves[TunnelInfo.currentCurve].length then
+        if Target == nil and Distance >= 1 then
             pause("Complete")
             return
         end
@@ -393,8 +393,26 @@ local function advancedTunnel()
         local newFacingDir, arrived = movement.moveToward(Target, FacingDir, log)
         FacingDir = newFacingDir
         if arrived then
+            if Target.y == pathing.getCurvePosAt(Distance, Curves[TunnelInfo.currentCurve]).y then
+                local has_block, data = turtle.inspectDown()
+                if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
+                    if not movement.placeBlockDown() then
+                        pause("Out of placement blocks")
+                        return
+                    end
+                end
+            end
+            if Target.y == pathing.getCurvePosAt(Distance, Curves[TunnelInfo.currentCurve]).y + TunnelInfo.height - 1 then
+                local has_block, data = turtle.inspectUp()
+                if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
+                    if not movement.placeBlockUp() then
+                        pause("Out of placement blocks")
+                        return
+                    end
+                end
+            end
             calculateNextTarget()
-            if Target == nil and Distance >= Curves[TunnelInfo.currentCurve].length then
+            if Target == nil and Distance >= 1 then
                 pause("Complete")
                 return
             end

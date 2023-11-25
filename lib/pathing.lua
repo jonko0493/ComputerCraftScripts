@@ -314,7 +314,7 @@ end
 
 local function getRailAngle(curve, distance)
     local pos1 = getCurvePosAt(distance, curve)
-    local pos2 = getCurvePosAt(distance + acceptableThreshold, curve)
+    local pos2 = getCurvePosAt(distance + 0.01, curve)
     return math.deg(math.atan(pos2.z - pos1.z, pos2.x - pos1.x))
 end
 
