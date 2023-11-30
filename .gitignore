@@ -1,6 +1,9 @@
 # Data Files
 data/
 
+# TV (see https://github.com/jonko0493/ComputerCraftTV)
+tv/
+
 # Compiled Lua sources
 luac.out
 
