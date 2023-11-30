@@ -20,7 +20,7 @@ end
 
 local function addTurtle(id, w)
     local randColor = "#"..string.format("%02x", math.random(0, 255))..string.format("%02x", math.random(0, 255))..string.format("%02x", math.random(0, 255))
-    table.insert(Turtles, { id = id, name = "", color = randColor, x = 0, y = 0, z = 0, fuel = 0, maxFuel = 1, progress = 0, status = "Unknown", route = {}, preview = false, lastMessageReceived = os.epoch() / 72000 })
+    table.insert(Turtles, { id = id, name = "", follower = "", color = randColor, x = 0, y = 0, z = 0, fuel = 0, maxFuel = 1, progress = 0, status = "Unknown", route = {}, preview = false, lastMessageReceived = os.epoch() / 72000 })
     loglib.log(LogName, "Added turtle "..id..". There are now "..#Turtles.." turtles.")
 end
 
@@ -37,6 +37,7 @@ local function updateTurtle(id, turtleData)
         return
     end
     Turtles[idx].name = turtleData.name
+    Turtles[idx].follower = turtleData.follower
     Turtles[idx].x = turtleData.x
     Turtles[idx].y = turtleData.y
     Turtles[idx].z = turtleData.z
@@ -86,8 +87,27 @@ local cart = peripheral.find("cartographer")
 if not contains(cart.getMarkerSets(), "turtles") then
     cart.addMarkerSet("turtles", "Turtles")
 end
+if not contains(cart.getMarkerSets(), "chunky-turtles") then
+    cart.addMarkerSet("chunky-turtles", "Chunky Turtles")
+end
 if not contains(cart.getMarkerSets(), "turtlePreviews") then
     cart.addMarkerSet("turtlePreviews", "Tunneling Routes")
+end
+
+local function updateFollower(hostname, route, progress)
+    if progress > 2.5 then
+        local follower = rednet.lookup("chunky-follower", hostname)
+        if follower ~= nil then
+            local nextPos = pathing.getCurvePosAtDistance(progress - 2.5, route)
+            rednet.send(follower, textutils.serialize(nextPos), "chunky-follower")
+            local id, msg = rednet.receive("chunky-follower", 2)
+            if msg ~= nil then
+                local currentPos = textutils.unserialize(msg)
+                cart.removeMarker("chunky-turtles", "chunky"..id)
+                cart.addPOIMarker("chunky-turtles", "chunky"..id, hostname, hostname, currentPos.x, currentPos.y, currentPos.z, "https://docs.siredvin.site/images/turtlematic/chunk_vial_turtle.png")
+            end
+        end
+    end
 end
 
 while true do
@@ -107,6 +127,7 @@ while true do
             if message ~= nil and message ~= "started" and message ~= "paused" then
                 local progressData = textutils.unserialize(message)
                 updateTurtle(id, progressData)
+                updateFollower(progressData.follower, progressData.route[progressData.currentCurve], progressData.progress / 100 * progressData.route[progressData.currentCurve].length)
             end
 
             cart.removeMarker("turtles", "turtle"..tunnelTurtle.id)

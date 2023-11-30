@@ -1,16 +1,3 @@
-local function moveForward()
-    if turtle.detect() then
-        turtle.dig()
-    end
-    if not turtle.forward() then
-        -- something's blocking us -- most likely this is just a gravity-affected block, so we'll dig until we're clear
-        -- we could also be out of fuel but this is harmless
-        repeat
-            turtle.dig()
-        until turtle.forward()
-    end
-end
-
 local function moveUp()
     if turtle.detectUp() then
         turtle.digUp()
@@ -21,9 +8,35 @@ local function moveUp()
     end
 end
 
+local function moveForward()
+    local has_block, details = turtle.inspect()
+    if has_block then
+        -- we want to avoid eating our little follower, so this is a basic heuristic for that
+        if details.name == "computercraft:turtle_normal" then
+            moveUp()
+            moveForward()
+        else
+            turtle.dig()
+        end
+    end
+    if not turtle.forward() then
+        -- something's blocking us -- most likely this is just a gravity-affected block, so we'll dig until we're clear
+        -- we could also be out of fuel but this is harmless
+        repeat
+            turtle.dig()
+        until turtle.forward()
+    end
+end
+
 local function moveDown()
-    if turtle.detectDown() then
-        turtle.digDown()
+    local has_block, details = turtle.inspectDown()
+    if has_block then
+        if details.name == "computercraft:turtle_normal" then
+            moveForward()
+            moveDown()
+        else
+            turtle.digDown()
+        end
     end
     if not turtle.down() then
         -- most likely we're out of fuel

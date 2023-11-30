@@ -312,9 +312,42 @@ local function getCurvePosAt(t, curve)
     end
 end
 
+local function getCurvePosAtDistance(rawValue, curve)
+    local count1 = math.abs(curve.tEnd1 - curve.tStart1)
+    local count2 = math.abs(curve.tEnd2 - curve.tStart2)
+    local value = math.min(math.max(0, rawValue), count1 + count2)
+    local y = curve.y1
+
+    if value <= count1 then
+        local tloc = 1
+        if curve.reverseT1 then
+            tloc = -1
+        end
+        local pos = getPositionXZ(curve.h1, curve.k1, curve.r1, tloc * value + curve.tStart1, 0, curve.isStraight1, y)
+        pos.x = math.floor(pos.x + 0.5)
+        pos.z = math.floor(pos.z + 0.5)
+        return pos
+    else
+        local tloc = 1
+        if curve.reverseT2 then
+            tloc = -1
+        end
+        local pos = getPositionXZ(curve.h2, curve.k2, curve.r2, tloc * (value - count1) + curve.tStart2, 0, curve.isStraight2, y)
+        pos.x = math.floor(pos.x + 0.5)
+        pos.z = math.floor(pos.z + 0.5)
+        return pos
+    end
+end
+
 local function getRailAngle(curve, distance)
     local pos1 = getCurvePosAt(distance, curve)
     local pos2 = getCurvePosAt(distance + 0.01, curve)
+    return math.deg(math.atan(pos2.z - pos1.z, pos2.x - pos1.x))
+end
+
+local function getRailAngleAtDistance(curve, distance)
+    local pos1 = getCurvePosAtDistance(distance, curve)
+    local pos2 = getCurvePosAtDistance(distance + 0.01, curve)
     return math.deg(math.atan(pos2.z - pos1.z, pos2.x - pos1.x))
 end
 
@@ -343,4 +376,4 @@ local function rectangularPrismContainsPoint(a, b, c, d, y1, y2, m)
         and dotAMAC <= dotACAC
 end
 
-return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt, getRailAngle = getRailAngle, rectangularPrismContainsPoint = rectangularPrismContainsPoint, yRot = yRot }
+return { getCurvesFromPoints = getCurvesFromPoints, getCurvePosAt = getCurvePosAt, getCurvePosAtDistance = getCurvePosAtDistance, getRailAngle = getRailAngle, getRailAngleAtDistance = getRailAngleAtDistance, rectangularPrismContainsPoint = rectangularPrismContainsPoint, yRot = yRot }
