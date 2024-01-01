@@ -9,12 +9,14 @@ local function moveUp()
 end
 
 local function moveForward()
+    local has_turtle = false
     local has_block, details = turtle.inspect()
     if has_block then
         -- we want to avoid eating our little follower, so this is a basic heuristic for that
         if details.name == "computercraft:turtle_normal" then
             moveUp()
             moveForward()
+            has_turtle = true
         else
             turtle.dig()
         end
@@ -26,6 +28,8 @@ local function moveForward()
             turtle.dig()
         until turtle.forward()
     end
+
+    return has_turtle
 end
 
 local function moveDown()
@@ -147,6 +151,7 @@ local function reverse(facingDir)
 end
 
 local function moveToward(point, facingDir, log)
+    local has_turtle = false
     local x, y, z = gps.locate()
     if x == point.x and y == point.y and z == point.z then
         return facingDir, true
@@ -176,7 +181,7 @@ local function moveToward(point, facingDir, log)
         else
             facingDir = turnToward(facingDir, "-x", log)
         end
-        moveForward()
+        has_turtle = moveForward()
     end
     if dy == math.min(dx, dy, dz) then
         if y < point.y then
@@ -191,9 +196,9 @@ local function moveToward(point, facingDir, log)
         else
             facingDir = turnToward(facingDir, "-z", log)
         end
-        moveForward()
+        has_turtle = moveForward()
     end
-    return facingDir, false
+    return facingDir, false, has_turtle
 end
 
 local function determineFacingDirection()

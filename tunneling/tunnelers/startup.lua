@@ -202,12 +202,12 @@ local function act()
             log("Tunnel axes calculated for frame: "..TunnelInfo.frameWAxis.." by "..TunnelInfo.frameHAxis)
 
             repeat
-                local facingDir, success = movement.moveToward(frame, FacingDir, log)
+                local facingDir, success, _ = movement.moveToward(frame, FacingDir, log)
                 FacingDir = facingDir
                 x, y, z = gps.locate()
             until x == frame.x and y == frame.y and z == frame.z
         else
-            local facingDir, success = movement.moveToward(frame, FacingDir, log)
+            local facingDir, success, _ = movement.moveToward(frame, FacingDir, log)
             FacingDir = facingDir
             return
         end
@@ -225,7 +225,7 @@ local function act()
         log("Start of frame info: Frame progress: "..TunnelInfo.frameProgress..", w-axis: "..TunnelInfo.frameWAxis..", h-axis: "..TunnelInfo.frameHAxis)
         if TunnelInfo.frameProgress == 0 then
             repeat
-                local facingDir, success = movement.moveToward(frame, FacingDir, log)
+                local facingDir, success, _ = movement.moveToward(frame, FacingDir, log)
                 FacingDir = facingDir
                 x, y, z = gps.locate()
             until x == frame.x and y == frame.y and z == frame.z
@@ -389,24 +389,26 @@ local function advancedTunnel()
         end
     end
     if Target ~= nil then
-        local newFacingDir, arrived = movement.moveToward(Target, FacingDir, log)
+        local newFacingDir, arrived, has_turtle = movement.moveToward(Target, FacingDir, log)
         FacingDir = newFacingDir
-        if arrived then
-            if Target.y == pathing.getCurvePosAtDistance(Distance, Curves[TunnelInfo.currentCurve]).y then
-                local has_block, data = turtle.inspectDown()
-                if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
-                    if not movement.placeBlockDown() then
-                        pause("Out of placement blocks")
-                        return
+        if arrived or has_turtle then
+            if not has_turtle then
+                if Target.y == pathing.getCurvePosAtDistance(Distance, Curves[TunnelInfo.currentCurve]).y then
+                    local has_block, data = turtle.inspectDown()
+                    if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
+                        if not movement.placeBlockDown() then
+                            pause("Out of placement blocks")
+                            return
+                        end
                     end
                 end
-            end
-            if Target.y == pathing.getCurvePosAtDistance(Distance, Curves[TunnelInfo.currentCurve]).y + TunnelInfo.height - 1 then
-                local has_block, data = turtle.inspectUp()
-                if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
-                    if not movement.placeBlockUp() then
-                        pause("Out of placement blocks")
-                        return
+                if Target.y == pathing.getCurvePosAtDistance(Distance, Curves[TunnelInfo.currentCurve]).y + TunnelInfo.height - 1 then
+                    local has_block, data = turtle.inspectUp()
+                    if (has_block and (data.name == "minecraft:lava" or data.name == "minecraft:water")) or not has_block then
+                        if not movement.placeBlockUp() then
+                            pause("Out of placement blocks")
+                            return
+                        end
                     end
                 end
             end
@@ -548,7 +550,8 @@ local function decide()
         Calculating = false
     elseif Function == "goto" then
         Calculating = true
-        FacingDir = movement.moveToward(Target, FacingDir, log)
+        local newFacingDir, _, _ = movement.moveToward(Target, FacingDir, log)
+        FacingDir = newFacingDir
         Calculating = false
     elseif Function == "advanced-tunnel" then
         advancedTunnel()
